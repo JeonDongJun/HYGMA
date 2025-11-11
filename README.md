@@ -65,3 +65,20 @@ python -m pysc2.bin.play --norender --rgb_minimap_size 0 --replay NAME.SC2Replay
 ## Citation
 
 If you find our paper and implementation helpful, please consider citing us.
+```
+@InProceedings{pmlr-v267-liu25af,
+  title = 	 {{HYGMA}: Hypergraph Coordination Networks with Dynamic Grouping for Multi-Agent Reinforcement Learning},
+  author =       {Liu, Chiqiang and Li, Dazi},
+  booktitle = 	 {Proceedings of the 42nd International Conference on Machine Learning},
+  pages = 	 {38767--38788},
+  year = 	 {2025},
+  editor = 	 {Singh, Aarti and Fazel, Maryam and Hsu, Daniel and Lacoste-Julien, Simon and Berkenkamp, Felix and Maharaj, Tegan and Wagstaff, Kiri and Zhu, Jerry},
+  volume = 	 {267},
+  series = 	 {Proceedings of Machine Learning Research},
+  month = 	 {13--19 Jul},
+  publisher =    {PMLR},
+  url = 	 {https://proceedings.mlr.press/v267/liu25af.html}
+}
+
+```
+<br />
