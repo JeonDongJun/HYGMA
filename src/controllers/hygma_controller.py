@@ -51,6 +51,14 @@ class HYGMA(nn.Module):
         self.fix_hgcn_steps = args.fix_hgcn_steps
         self.fix_grouping_steps = args.fix_grouping_steps
 
+        # 行위 편향 설정(그룹별 성향)
+        self.behavior_bias_cfg = getattr(args, "behavior_bias", {}) or {}
+        self.behavior_enabled = self.behavior_bias_cfg.get("enabled", False)
+        self.behavior_profiles = self.behavior_bias_cfg.get("profiles", {}) or {}
+        self.agent_personalities = self.behavior_bias_cfg.get("agent_personalities", [])
+        self.attack_start_action = self.behavior_bias_cfg.get("attack_start_action", 6)
+        self.hold_actions = self.behavior_bias_cfg.get("hold_actions", [0, 5])
+
 
     def select_actions(self, ep_batch, t_ep, t_env, bs=slice(None), test_mode=False):
         # 保持原有的选择动作逻辑
@@ -113,6 +121,9 @@ class HYGMA(nn.Module):
         # 使用RNN处理结合后的输入
         agent_outs, self.hidden_states = self.agent(combined_inputs, self.hidden_states)
 
+        # 그룹별 행동 편향을 적용해 공격/이동/대기 성향을 다르게 학습
+        agent_outs = self._apply_behavior_bias(agent_outs, avail_actions)
+
         # 处理agent输出
         if self.agent_output_type == "pi_logits":
             if getattr(self.args, "mask_before_softmax", True):
@@ -133,6 +144,63 @@ class HYGMA(nn.Module):
 
 
         return agent_outs.view(ep_batch.batch_size, self.n_agents, -1)
+
+    def _apply_behavior_bias(self, agent_outs, avail_actions):
+        """
+        그룹 또는 개별 에이전트에 대한 성향(공격/방어)을 Q 값 혹은 정책 로짓에 가중치로 반영한다.
+
+        - 공격 성향: attack_bias 를 공격 액션 구간(기본값 index 6 이후)에 더한다.
+        - 이동 성향: move_bias 를 이동/정지 액션 구간(기본값 1~attack_start_action-1)에 더한다.
+        - 대기 성향: hold_bias 를 지정된 hold_actions (기본 0, 5)에 더한다.
+
+        bias 는 이용 가능(avail_actions)한 액션에 대해서만 적용된다.
+        """
+
+        if not self.behavior_enabled or not self.behavior_profiles:
+            return agent_outs
+
+        batch_agents, n_actions = agent_outs.shape
+        batch_size = batch_agents // self.n_agents
+
+        if batch_size * self.n_agents != batch_agents:
+            return agent_outs
+
+        flat_avail = avail_actions.view(batch_size * self.n_agents, n_actions)
+        biases = th.zeros_like(agent_outs)
+
+        for agent_idx in range(self.n_agents):
+            profile_name = self.agent_personalities[agent_idx] if agent_idx < len(self.agent_personalities) else None
+            if profile_name is None:
+                continue
+
+            profile = self.behavior_profiles.get(profile_name)
+            if profile is None:
+                continue
+
+            attack_bias = profile.get("attack_bias", 0.0)
+            move_bias = profile.get("move_bias", 0.0)
+            hold_bias = profile.get("hold_bias", 0.0)
+
+            agent_positions = slice(agent_idx, batch_size * self.n_agents, self.n_agents)
+            agent_avail = flat_avail[agent_positions]
+
+            attack_mask = th.zeros_like(agent_avail)
+            if self.attack_start_action < n_actions:
+                attack_mask[:, self.attack_start_action:] = agent_avail[:, self.attack_start_action:]
+
+            move_mask = th.zeros_like(agent_avail)
+            move_upper = min(self.attack_start_action, n_actions)
+            if move_upper > 1:
+                move_mask[:, 1:move_upper] = agent_avail[:, 1:move_upper]
+
+            hold_mask = th.zeros_like(agent_avail)
+            for hold_id in self.hold_actions:
+                if 0 <= hold_id < n_actions:
+                    hold_mask[:, hold_id] = agent_avail[:, hold_id]
+
+            biases[agent_positions] = attack_bias * attack_mask + move_bias * move_mask + hold_bias * hold_mask
+
+        return agent_outs + biases
 
     def _create_hypergraph(self, groups, batch_size):
         """

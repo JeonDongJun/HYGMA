@@ -16,6 +16,24 @@ weight_decay: 0.01  # 权重衰减
 batch_size_run: 1 # Number of environments to run in parallel
 runner: "episode"# Runs 1 env for an episode
 
+# 그룹/개인 성향을 통한 행동 편향 설정 (실험별로 공격/방어 스타일을 다르게 부여 가능)
+behavior_bias:
+  enabled: False
+  attack_start_action: 6   # SMAC 기본 공격 액션 시작 index
+  hold_actions: [0, 5]     # 대기/정지로 간주할 액션 index 목록
+  # 개별 성향 이름에 따른 편향 값. 필요 시 자유롭게 추가/수정.
+  profiles:
+    aggressive:
+      attack_bias: 1.0
+      move_bias: -0.2
+      hold_bias: -0.1
+    defensive:
+      attack_bias: -0.5
+      move_bias: 0.2
+      hold_bias: 0.6
+  # 에이전트별 적용할 성향 이름(길이 n_agents). 예: ["aggressive", "aggressive", "defensive", ...]
+  agent_personalities: []
+
 mac: "hygma_mac"
 
 batch_size: 128 # Number of episodes to train on
