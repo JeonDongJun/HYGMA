@@ -165,7 +165,7 @@ class HYGMA(nn.Module):
         if batch_size * self.n_agents != batch_agents:
             return agent_outs
 
-        flat_avail = avail_actions.view(batch_size * self.n_agents, n_actions)
+        flat_avail = avail_actions.reshape(batch_size * self.n_agents, n_actions)
         biases = th.zeros_like(agent_outs)
 
         for agent_idx in range(self.n_agents):
