@@ -1,4 +1,4 @@
-absl-py==0.5.0
+absl-py
 atomicwrites==1.2.1
 attrs==18.2.0
 brotlipy==0.7.0
